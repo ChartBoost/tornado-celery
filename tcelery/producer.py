@@ -20,17 +20,46 @@ class MissingBrokerException(Exception):
     pass
 
 
+class BrokerConnectionClosed(Exception):
+    pass
+
+
+class BrokerTimeout(Exception):
+    pass
+
+
+class MessageReturned(Exception):
+    pass
+
+
+class BrokerThrottleException(Exception):
+    pass
+
+
 class NonBlockingTaskProducer(TaskProducer):
 
     conn_pool = None
     app = None
+    TIMEOUT = 5
     result_cls = AsyncResult
 
     def __init__(self, channel=None, *args, **kwargs):
         super(NonBlockingTaskProducer, self).__init__(channel, *args, **kwargs)
 
     def on_publish(self, callback, task_id, backend, *args):
-        callback(self.result_cls(task_id, backend))
+        callback(self.result_cls(task_id=task_id, backend=backend))
+
+    def on_connection_close(self, *args):
+        raise BrokerConnectionClosed('Broker cancelled the message')
+
+    def on_timeout(self, *args):
+        raise BrokerTimeout("Message timed out")
+
+    def on_return_callback(self, *args):
+        raise MessageReturned("Message returned")
+
+    def on_tcp_backpressure(self, *args):
+        raise BrokerThrottleException("Broker appears to be throttling")
 
     def on_cancel(self):
         pass
@@ -68,7 +97,15 @@ class NonBlockingTaskProducer(TaskProducer):
         if conn.connection.is_closed:
             raise MissingBrokerException('Broker Connection is Closed')
 
-        conn.channel.confirm_delivery(partial(self.on_publish, callback, task_id, self.app.backend))
+        # Add our basic publish callback
+        if callback:
+            conn.channel.confirm_delivery(partial(self.on_publish, callback, task_id, self.app.backend))
+        # Add error state exceptions
+        conn.connection.add_on_close_callback(self.on_connection_close)
+        conn.connection.add_timeout(self.TIMEOUT, self.on_timeout)
+        conn.channel.add_on_return_callback(self.on_return_callback)
+        conn.connection.add_backpressure_callback(self.on_tcp_backpressure)
+
         result = publish(body, priority=priority, content_type=content_type,
                          content_encoding=content_encoding, headers=headers,
                          properties=properties, routing_key=routing_key,
