@@ -51,9 +51,6 @@ class NonBlockingTaskProducer(TaskProducer):
 
         if callback and not callable(callback):
             raise ValueError('callback should be callable')
-        if callback and not isinstance(self.app.backend, AMQPBackend):
-            raise NotImplementedError(
-                    'callback can be used only with AMQP backend')
 
         body, content_type, content_encoding = self._prepare(
             body, serializer, content_type, content_encoding,
