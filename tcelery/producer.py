@@ -20,22 +20,6 @@ class MissingBrokerException(Exception):
     pass
 
 
-class BrokerConnectionClosed(Exception):
-    pass
-
-
-class BrokerTimeout(Exception):
-    pass
-
-
-class MessageReturned(Exception):
-    pass
-
-
-class BrokerThrottleException(Exception):
-    pass
-
-
 class NonBlockingTaskProducer(TaskProducer):
 
     conn_pool = None
@@ -48,21 +32,6 @@ class NonBlockingTaskProducer(TaskProducer):
 
     def on_publish(self, callback, task_id, backend, *args):
         callback(self.result_cls(task_id=task_id, backend=backend))
-
-    def on_connection_close(self, *args):
-        raise BrokerConnectionClosed('Broker cancelled the message')
-
-    def on_timeout(self, *args):
-        raise BrokerTimeout("Message timed out")
-
-    def on_return_callback(self, *args):
-        raise MessageReturned("Message returned")
-
-    def on_tcp_backpressure(self, *args):
-        raise BrokerThrottleException("Broker appears to be throttling")
-
-    def on_cancel(self):
-        pass
 
     def publish(self, body, routing_key=None, delivery_mode=None,
                 mandatory=False, immediate=False, priority=0,
@@ -100,10 +69,6 @@ class NonBlockingTaskProducer(TaskProducer):
         # Add our basic publish callback
         if callback:
             conn.channel.confirm_delivery(partial(self.on_publish, callback, task_id, self.app.backend))
-        # Add error state exceptions
-        conn.connection.add_on_close_callback(self.on_connection_close)
-        conn.channel.add_on_return_callback(self.on_return_callback)
-        conn.connection.add_backpressure_callback(self.on_tcp_backpressure)
 
         result = publish(body, priority=priority, content_type=content_type,
                          content_encoding=content_encoding, headers=headers,

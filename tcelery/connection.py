@@ -17,6 +17,18 @@ from pika.exceptions import AMQPConnectionError
 from tornado import ioloop
 
 
+class BrokerThrottleException(Exception):
+    pass
+
+
+class BrokerConnectionClosed(Exception):
+    pass
+
+
+class MessageReturned(Exception):
+    pass
+
+
 class Connection(object):
 
     content_type = 'application/x-python-serialize'
@@ -58,8 +70,12 @@ class Connection(object):
         self.connection.add_on_close_callback(self.on_closed)
         self.connection.channel(partial(self.on_channel_open, callback))
 
+    def on_return_callback(self, *args):
+        raise MessageReturned("Message returned")
+
     def on_channel_open(self, callback, channel):
         self.channel = channel
+        self.channel.add_on_return_callback(self.on_return_callback)
         if callback:
             callback()
 
@@ -125,11 +141,19 @@ class ConnectionPool(object):
                          callback=partial(self._on_connect, conn))
 
     def _on_connect(self, connection):
+        connection.add_on_close_callback(self._on_connection_close_callback)
+        connection.add_backpressure_callback(self._on_tcp_backpressure_callback)
         self._connections.append(connection)
         if len(self._connections) == self._limit:
             self._connection = cycle(self._connections)
             if self._on_ready:
                 self._on_ready()
+
+    def _on_connection_close_callback(self, *args):
+        raise BrokerConnectionClosed('Broker cancelled the message')
+
+    def _on_tcp_backpressure_callback(self, *args):
+        raise BrokerThrottleException("Broker appears to be throttling")
 
     def connection(self):
         assert self._connection is not None
