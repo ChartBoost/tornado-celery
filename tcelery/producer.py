@@ -102,7 +102,6 @@ class NonBlockingTaskProducer(TaskProducer):
             conn.channel.confirm_delivery(partial(self.on_publish, callback, task_id, self.app.backend))
         # Add error state exceptions
         conn.connection.add_on_close_callback(self.on_connection_close)
-        conn.connection.add_timeout(self.TIMEOUT, self.on_timeout)
         conn.channel.add_on_return_callback(self.on_return_callback)
         conn.connection.add_backpressure_callback(self.on_tcp_backpressure)
 
