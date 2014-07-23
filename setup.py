@@ -59,7 +59,7 @@ setup(
     url='https://github.com/mher/tornado-celery',
     license='BSD',
     classifiers=classifiers,
-    packages=find_packages(exclude=['tests', 'tests.*']),
+    packages=['tcelery'],
     dependency_links=dependency_links,
     install_requires=install_requires,
     entry_points={

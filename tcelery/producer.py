@@ -16,6 +16,10 @@ from .result import AsyncResult
 is_py3k = sys.version_info >= (3, 0)
 
 
+class MissingBrokerException(Exception):
+    pass
+
+
 class NonBlockingTaskProducer(TaskProducer):
 
     conn_pool = None
@@ -23,8 +27,13 @@ class NonBlockingTaskProducer(TaskProducer):
     result_cls = AsyncResult
 
     def __init__(self, channel=None, *args, **kwargs):
-        super(NonBlockingTaskProducer, self).__init__(
-                channel, *args, **kwargs)
+        super(NonBlockingTaskProducer, self).__init__(channel, *args, **kwargs)
+
+    def on_publish(self, callback, task_id, backend, *args):
+        callback(self.result_cls(task_id, backend))
+
+    def on_cancel(self):
+        pass
 
     def publish(self, body, routing_key=None, delivery_mode=None,
                 mandatory=False, immediate=False, priority=0,
@@ -54,22 +63,21 @@ class NonBlockingTaskProducer(TaskProducer):
 
         serialization.registry.enable(serializer)
 
-        (self.content_type,
-         self.content_encoding,
-         self.encoder) = serialization.registry._encoders[self.serializer]
+        (self.content_type, self.content_encoding, self.encoder) = serialization.registry._encoders[self.serializer]
 
         conn = self.conn_pool.connection()
         publish = conn.publish
+
+        if conn.connection.is_closed:
+            raise MissingBrokerException('Broker Connection is Closed')
+
+        conn.channel.confirm_delivery(partial(self.on_publish, callback, task_id, self.app.backend))
         result = publish(body, priority=priority, content_type=content_type,
                          content_encoding=content_encoding, headers=headers,
                          properties=properties, routing_key=routing_key,
                          mandatory=mandatory, immediate=immediate,
                          exchange=exchange, declare=declare)
 
-        if callback:
-            conn.consume(task_id.replace('-', ''),
-                         partial(self.on_result, callback),
-                         x_expires=self.prepare_expires(type=int))
         return result
 
     def decode(self, payload):

@@ -5,7 +5,7 @@ import celery
 from tornado import ioloop
 
 from .connection import ConnectionPool
-from .producer import NonBlockingTaskProducer
+from .producer import NonBlockingTaskProducer, MissingBrokerException
 from .result import AsyncResult
 
 VERSION = (0, 3, 5)
