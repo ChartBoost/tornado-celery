@@ -141,8 +141,8 @@ class ConnectionPool(object):
                          callback=partial(self._on_connect, conn))
 
     def _on_connect(self, connection):
-        connection.add_on_close_callback(self._on_connection_close_callback)
-        connection.add_backpressure_callback(self._on_tcp_backpressure_callback)
+        connection.connection.add_on_close_callback(self._on_connection_close_callback)
+        connection.connection.add_backpressure_callback(self._on_tcp_backpressure_callback)
         self._connections.append(connection)
         if len(self._connections) == self._limit:
             self._connection = cycle(self._connections)
