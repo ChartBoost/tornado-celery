@@ -68,9 +68,7 @@ class NonBlockingTaskProducer(TaskProducer):
             raise MissingBrokerException('Broker Connection is Closed')
         publish_future = Future()
 
-        # Add our basic publish callback
-        if callback:
-            conn.channel.confirm_delivery(partial(self.on_publish, task_id, publish_future, self.app.backend))
+        conn.channel.confirm_delivery(partial(self.on_publish, task_id, publish_future, self.app.backend))
 
         result = publish(body, priority=priority, content_type=content_type,
                          content_encoding=content_encoding, headers=headers,
