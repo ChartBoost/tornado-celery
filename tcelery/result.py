@@ -1,10 +1,10 @@
 from __future__ import absolute_import
 from __future__ import with_statement
 
-import celery
+from celery import result
 
 
-class AsyncResult(celery.result.AsyncResult):
+class AsyncResult(result.AsyncResult):
     def __init__(self, task_id, status=None, traceback=None, result=None,
                  **kwargs):
         super(AsyncResult, self).__init__(task_id)
