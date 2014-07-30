@@ -10,6 +10,7 @@ from kombu import serialization
 from celery.app.amqp import TaskProducer
 from celery.backends.amqp import AMQPBackend
 from celery.utils import timeutils
+from tornado.concurrent import Future
 
 from .result import AsyncResult
 
@@ -30,8 +31,8 @@ class NonBlockingTaskProducer(TaskProducer):
     def __init__(self, channel=None, *args, **kwargs):
         super(NonBlockingTaskProducer, self).__init__(channel, *args, **kwargs)
 
-    def on_publish(self, callback, task_id, backend, *args):
-        callback(self.result_cls(task_id=task_id, backend=backend))
+    def on_publish(self, task_id, future, backend, *args):
+        future.set_result(self.result_cls(task_id, backend=backend))
 
     def publish(self, body, routing_key=None, delivery_mode=None,
                 mandatory=False, immediate=False, priority=0,
@@ -65,10 +66,11 @@ class NonBlockingTaskProducer(TaskProducer):
 
         if conn.connection.is_closed:
             raise MissingBrokerException('Broker Connection is Closed')
+        publish_future = Future()
 
         # Add our basic publish callback
         if callback:
-            conn.channel.confirm_delivery(partial(self.on_publish, callback, task_id, self.app.backend))
+            conn.channel.confirm_delivery(partial(self.on_publish, task_id, publish_future, self.app.backend))
 
         result = publish(body, priority=priority, content_type=content_type,
                          content_encoding=content_encoding, headers=headers,
@@ -76,7 +78,8 @@ class NonBlockingTaskProducer(TaskProducer):
                          mandatory=mandatory, immediate=immediate,
                          exchange=exchange, declare=declare)
 
-        return result
+
+        return publish_future
 
     def decode(self, payload):
         payload = is_py3k and payload or str(payload)
