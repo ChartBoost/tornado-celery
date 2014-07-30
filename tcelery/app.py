@@ -32,13 +32,12 @@ class AsyncCelery(celery.Celery):
             producer = self.amqp.TaskProducer(connection)
         with self.producer_or_acquire(producer) as P:
             self.backend.on_task_call(P, task_id)
-            task_id = P.publish_task(
+            publish_future = P.publish_task(
                 name, args, kwargs, countdown=countdown, eta=eta,
                 task_id=task_id, expires=expires,
                 callbacks=maybe_list(link), errbacks=maybe_list(link_error),
                 reply_to=reply_to or self.oid, **options
             )
-        result = (result_cls or self.AsyncResult)(task_id)
         if add_to_parent:
             parent = get_current_worker_task()
             if parent:
