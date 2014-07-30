@@ -38,11 +38,7 @@ class AsyncCelery(celery.Celery):
                 callbacks=maybe_list(link), errbacks=maybe_list(link_error),
                 reply_to=reply_to or self.oid, **options
             )
-        if add_to_parent:
-            parent = get_current_worker_task()
-            if parent:
-                parent.add_trail(result)
-        return result
+        return publish_future
 
 
 class Application(web.Application):
