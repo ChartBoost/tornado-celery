@@ -37,6 +37,7 @@ class NonBlockingTaskProducer(TaskProducer):
 
     def __init__(self, channel=None, *args, **kwargs):
         super(NonBlockingTaskProducer, self).__init__(channel, *args, **kwargs)
+        self._default_mode = 1
 
     def on_publish(self, task_id, future, backend, *args):
         future.set_result(self.result_cls(task_id, backend=backend))
